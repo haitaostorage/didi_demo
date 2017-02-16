@@ -1,1 +1,9 @@
 simple didichuxing sysytem demon
+
+Start server:
+export GOAPTH=$GOPATH:/path/to/project
+go install server
+./bin/server
+
+Client:
+modify ip of server
