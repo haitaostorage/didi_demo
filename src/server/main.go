@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"github.com/astaxie/beego/orm"
 	"github.com/donnie4w/go-logger/logger"
+	"github.com/garyburd/redigo/redis"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/websocket"
 	"net/http"

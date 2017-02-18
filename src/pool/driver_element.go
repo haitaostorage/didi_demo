@@ -3,6 +3,7 @@ package pool
 import(
 	"didi_api/models"
 	"github.com/donnie4w/go-logger/logger"
+	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
 	"sync"
 )
@@ -19,6 +20,7 @@ type ArrangedDriverPool struct {
 
 var Dpool *DriverPool
 var Apool *ArrangedDriverPool
+var RedisConn redis.Conn = nil
 
 type DriverElement struct {
 	Ws	     *websocket.Conn
@@ -33,12 +35,42 @@ type DriverElement struct {
 	D_y_scale    int
 }
 
-func NewDriverPool(size int) {
+func NewDriverPool(size int) err Error {
+	if RedisConn == nil {
+		RedisConn, err1 := redis.Dail("tcp", "localhost:6379")
+		if err1 != nil {
+			err = err1
+			logger.Error(err)
+			return
+		}
+	}
 	Dpool = &DriverPool{sync.Mutex{}, make(map[string]*DriverElement, size)}
+	reply, err1 := redis.StringMap(RedisConn.Do("hgetall","driver"))
+	for k, v := range reply {
+		var elem Driver
+		json.Unmarshal([]byte(v),&elem)
+		elem.Ws = nil
+		Dpool.DriverList[k] = elem
+	}
 }
 
 func NewArrangedDriverPool(size int) {
+	if RedisConn == nil {
+		RedisConn, err1 := redis.Dail("tcp", "localhost:6379")
+		if err1 != nil {
+			err = err1
+			logger.Error(err)
+			return
+		}
+	}
 	Apool =  &ArrangedDriverPool{sync.Mutex{}, make(map[string]*DriverElement, size)}
+	reply, err1 := redis.StringMap(RedisConn.Do("hgetall","adriver"))
+	for k, v := range reply {
+		var elem ArrangedDriver
+		json.Unmarshal([]byte(v),&elem)
+		elem.Ws = nil
+		Apool.ArrangedList[k] = elem
+	}
 }
 
 func NewDriverElement(ws *websocket.Conn, uid, pid string, x, y, status, p_x, p_y, d_x, d_y int) *DriverElement {
@@ -132,4 +164,28 @@ func Sched() {
 	}
 }
 
+func FlushDriverToCache(key string, elem *DriverElement) {
+	str, err := json.Marshal(elem)
+	if err != nil {
+		logger.Error("FlushDriverToCache error:", err)
+		return
+	}
+	_, err = RedisConn.Do("hset", "driver", key, str)
+	if err != nil {
+		logger.Error("FlushDriverToCache error", err)
+	}
+	return
+}
 
+func FlushAdriverToCache(key string, elem *DriverElement) {
+	str, err := json.Marshal(elem)
+	if err != nil {
+		logger.Error("FlushAdriverToCache error:", err)
+		return
+	}
+	_, err = RedisConn.Do("hset", "adriver", key, str)
+	if err != nil {
+		logger.Error("FlushAdriverToCache error", err)
+	}
+	return
+}

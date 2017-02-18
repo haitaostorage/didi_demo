@@ -14,9 +14,13 @@ func DriverPosition() {
 	for {
 		pool.Dpool.Lock.Lock()
 		for _, v := range pool.Dpool.DriverList {
+			if v.Ws == nil {
+				continue
+			}
 			x, y := RandomPosition(v.Self_x_scale, v.Self_y_scale)
 			v.Self_x_scale = x
 			v.Self_y_scale = y
+			FlushDriverToCache(v.Uid,v)
 			str, _ := json.Marshal(v)
 			if v.Ws.WriteMessage(websocket.TextMessage, str) != nil {
 				logger.Error("send driver positon infomation failure")
@@ -32,6 +36,9 @@ func ArrangeDriverPosition() {
 	for {
 		pool.Apool.Lock.Lock()
 		for _, v := range pool.Apool.ArrangedList {
+			if v.Ws == nil {
+				continue
+			}
 			pid := v.Puid
 			x := v.Self_x_scale
 			y := v.Self_y_scale
@@ -45,6 +52,7 @@ func ArrangeDriverPosition() {
 				v.Self_x_scale = next_x
 				v.Self_y_scale = next_y
 				state := pool.NewPassengerState(pid, next_x, next_y, models.DISPATCH)
+				pool.FlushAdriverToCache(pid,v)
 				job := Job{PayLoad: state}
 				JobQueue <- job
 			} else if x == p_x && y == p_y && v.Status == models.PREPARE { //到达上车地点
@@ -54,6 +62,7 @@ func ArrangeDriverPosition() {
 					v.Self_x_scale = next_x
 					v.Self_y_scale = next_y
 					state := pool.NewPassengerState(pid, next_x, next_y, models.DISPATCH)
+					pool.FlushAdriverToCache(pid,v)
 					job := Job{PayLoad: state}
 					JobQueue <- job
 				} else {
@@ -67,6 +76,7 @@ func ArrangeDriverPosition() {
 					v.Self_x_scale = next_x
 					v.Self_y_scale = next_y
 					state := pool.NewPassengerState(pid, next_x, next_y, models.DISPATCH)
+					pool.FlushAdriverToCache(pid,v)
 					job := Job{PayLoad: state}
 					JobQueue <- job
 				} else { //到达目的地,将司机释放回调度池

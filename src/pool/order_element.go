@@ -31,7 +31,22 @@ type OrderElement struct {
 var Opool *OrderPool
 
 func NewOrderPool(size int) {
+	if RedisConn == nil {
+		RedisConn, err1 := redis.Dail("tcp", "localhost:6379")
+		if err1 != nil {
+			err = err1
+			logger.Error(err)
+			return
+		}
+	}
 	Opool = &OrderPool{sync.Mutex{}, make(map[string]*OrderElement, size)}
+	reply, err1 := redis.StringMap(RedisConn.Do("hgetall","order"))
+	for k, v := range reply {
+		var elem Driver
+		json.Unmarshal([]byte(v),&elem)
+		elem.Ws = nil
+		Opool.OrderList[k] = elem
+	}
 }
 
 func NewOrder(pid, x, y, d_x, d_y int) models.Orders {
@@ -154,4 +169,18 @@ func (this *OrderElement) ArrangeDriver() {
 	Dpool.UpdateDriverOrderInfo(dselect, this)     //更新司机的信息
 	Apool.AddArrangedDriver(dselect)               //添加到已分配司机池
 	logger.Info("arrange an suitbale driver for the order")
+}
+
+func FlushOrderToCache(key string, order *OrderElement) {
+	str, err := json.Marshal(elem)
+	if err != nil {
+		logger.Error("FlushOrderToCache error:", err)
+		return
+	}
+	_, err = RedisConn.Do("hset", "order", key, str)
+	if err != nil {
+		logger.Error("FlushAdriverToCache error", err)
+	}
+	return
+
 }
