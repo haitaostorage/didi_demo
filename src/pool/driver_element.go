@@ -2,6 +2,7 @@ package pool
 
 import(
 	"didi_api/models"
+	"encoding/json"
 	"github.com/donnie4w/go-logger/logger"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
@@ -35,42 +36,42 @@ type DriverElement struct {
 	D_y_scale    int
 }
 
-func NewDriverPool(size int) err Error {
+func NewDriverPool(size int) (err error) {
 	if RedisConn == nil {
-		RedisConn, err1 := redis.Dail("tcp", "localhost:6379")
-		if err1 != nil {
-			err = err1
+		RedisConn, err = redis.Dial("tcp", "localhost:6379")
+		if err != nil {
 			logger.Error(err)
 			return
 		}
 	}
 	Dpool = &DriverPool{sync.Mutex{}, make(map[string]*DriverElement, size)}
-	reply, err1 := redis.StringMap(RedisConn.Do("hgetall","driver"))
+	reply, _ := redis.StringMap(RedisConn.Do("hgetall","driver"))
 	for k, v := range reply {
-		var elem Driver
+		var elem DriverElement
 		json.Unmarshal([]byte(v),&elem)
 		elem.Ws = nil
-		Dpool.DriverList[k] = elem
+		Dpool.DriverList[k] = &elem
 	}
+	return nil
 }
 
-func NewArrangedDriverPool(size int) {
+func NewArrangedDriverPool(size int) (err error) {
 	if RedisConn == nil {
-		RedisConn, err1 := redis.Dail("tcp", "localhost:6379")
-		if err1 != nil {
-			err = err1
+		RedisConn, err = redis.Dial("tcp", "localhost:6379")
+		if err != nil {
 			logger.Error(err)
 			return
 		}
 	}
 	Apool =  &ArrangedDriverPool{sync.Mutex{}, make(map[string]*DriverElement, size)}
-	reply, err1 := redis.StringMap(RedisConn.Do("hgetall","adriver"))
+	reply, _ := redis.StringMap(RedisConn.Do("hgetall","adriver"))
 	for k, v := range reply {
-		var elem ArrangedDriver
+		var elem DriverElement
 		json.Unmarshal([]byte(v),&elem)
 		elem.Ws = nil
-		Apool.ArrangedList[k] = elem
+		Apool.ArrangedList[k] = &elem
 	}
+	return nil
 }
 
 func NewDriverElement(ws *websocket.Conn, uid, pid string, x, y, status, p_x, p_y, d_x, d_y int) *DriverElement {

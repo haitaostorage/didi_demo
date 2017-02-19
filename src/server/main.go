@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"github.com/astaxie/beego/orm"
 	"github.com/donnie4w/go-logger/logger"
-	"github.com/garyburd/redigo/redis"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/websocket"
 	"net/http"
@@ -112,9 +111,19 @@ func JoinPool(w http.ResponseWriter, r *http.Request) {
 		JobQueue <- job
 		ret := <-pool.DriverChan
 		if ret {
-			logger.Warn("driver already exist in pool")
-			ws.Close()
-			return
+			if d, ok := pool.Dpool.DriverList[uid]; ok && d.Ws == nil {
+				logger.Info("driver reconnect...")
+				d.Ws = ws
+				return
+			} else if d, ok := pool.Apool.ArrangedList[uid]; ok && d.Ws == nil {
+				logger.Info("driver reconnected")
+				d.Ws = ws
+				return
+			} else {
+				logger.Warn("driver already exist in pool")
+				ws.Close()
+				return
+			}
 		}
 		//生成司机job结构,并放入待调度队列JobQueue
 		driver := pool.NewDriverElement(ws, uid, "", x, y, models.IDLE, -1, -1, -1, -1)
@@ -127,9 +136,15 @@ func JoinPool(w http.ResponseWriter, r *http.Request) {
 		JobQueue <- job
 		ret := <-pool.OrderChan
 		if ret {
-			logger.Warn("passenger already create an order")
-			ws.Close()
-			return
+			if o, ok := pool.Opool.OrderList[uid]; ok && o.Ws == nil {
+				logger.Info("passenger reconnected")
+				o.Ws = ws
+				return
+			} else {
+				logger.Warn("passenger already create an order")
+				ws.Close()
+				return
+			}
 		}
 		var d_x int
 		var d_y int

@@ -2,7 +2,9 @@ package pool
 
 import (
 	"didi_api/models"
+	"encoding/json"
 	"github.com/donnie4w/go-logger/logger"
+	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
 	"math"
 	"strconv"
@@ -30,23 +32,23 @@ type OrderElement struct {
 
 var Opool *OrderPool
 
-func NewOrderPool(size int) {
+func NewOrderPool(size int) (err error){
 	if RedisConn == nil {
-		RedisConn, err1 := redis.Dail("tcp", "localhost:6379")
-		if err1 != nil {
-			err = err1
+		RedisConn, err = redis.Dial("tcp", "localhost:6379")
+		if err != nil {
 			logger.Error(err)
 			return
 		}
 	}
 	Opool = &OrderPool{sync.Mutex{}, make(map[string]*OrderElement, size)}
-	reply, err1 := redis.StringMap(RedisConn.Do("hgetall","order"))
+	reply, _ := redis.StringMap(RedisConn.Do("hgetall","order"))
 	for k, v := range reply {
-		var elem Driver
+		var elem OrderElement
 		json.Unmarshal([]byte(v),&elem)
 		elem.Ws = nil
-		Opool.OrderList[k] = elem
+		Opool.OrderList[k] = &elem
 	}
+	return nil
 }
 
 func NewOrder(pid, x, y, d_x, d_y int) models.Orders {
@@ -110,7 +112,7 @@ func (this *OrderPool) UpdateOrderDriverInfo(e *OrderElement, uid string) {
 	e.Duid = uid
 	e.Status = models.DISPATCH
 	this.Lock.Unlock()
-	FlushOrderToCahce(e)
+	FlushOrderToCache(e)
 }
 
 func (this *OrderPool) AddOrder(e *OrderElement) {
@@ -168,9 +170,9 @@ func (this *OrderElement) ArrangeDriver() {
 		logger.Warn("not find an suitable driver for the order")
 		return
 	}
+	Dpool.UpdateDriverOrderInfo(dselect, this)     //更新司机的信息
 	Dpool.DelDriver(dselect)
 	Opool.UpdateOrderDriverInfo(this, dselect.Uid) //更新订单信息
-	Dpool.UpdateDriverOrderInfo(dselect, this)     //更新司机的信息
 	Apool.AddArrangedDriver(dselect)               //添加到已分配司机池
 	logger.Info("arrange an suitbale driver for the order")
 }

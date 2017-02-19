@@ -24,7 +24,7 @@ func (this *PassengerState) UpdatePassengerState() {
 		v.Self_x_scale = this.x
 		v.Self_y_scale = this.y
 		v.Status = this.status
-		FlushOrderToCache(v.Puid,v)
+		FlushOrderToCache(v)
 	}
 	Opool.Lock.Unlock()
 }
