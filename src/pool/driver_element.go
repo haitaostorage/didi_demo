@@ -92,6 +92,7 @@ func (this *DriverPool) AddDriver(e *DriverElement) {
 	this.Lock.Lock()
 	this.DriverList[e.Uid] = e
 	this.Lock.Unlock()
+	FlushDriverToCache(e)
 
 }
 
@@ -100,6 +101,7 @@ func (this *DriverPool) DelDriver(e *DriverElement) *DriverElement {
 	elem := this.DriverList[e.Uid]
 	delete(this.DriverList, e.Uid)
 	this.Lock.Unlock()
+	DelDriverFromCache(e.Uid)
 	return elem
 }
 
@@ -108,6 +110,7 @@ func (this *DriverPool) DelDriverById(uid string) *DriverElement {
 	elem := this.DriverList[uid]
 	delete(this.DriverList, uid)
 	this.Lock.Unlock()
+	DelDriverFromCache(uid)
 	return elem
 }
 
@@ -121,12 +124,14 @@ func (this *DriverPool) UpdateDriverOrderInfo(e *DriverElement, orderinfo *Order
 	e.D_x_scale = orderinfo.D_x_scale
 	e.D_y_scale = orderinfo.D_y_scale
 	this.Lock.Unlock()
+	FlushDriverToCache(e)
 }
 
 func (this *ArrangedDriverPool) AddArrangedDriver(e *DriverElement) {
 	this.Lock.Lock()
 	this.ArrangedList[e.Uid] = e
 	this.Lock.Unlock()
+	FlushAdriverToCache(e)
 }
 
 func (this *ArrangedDriverPool) DelArrangedDriver(e *DriverElement) *DriverElement {
@@ -134,6 +139,7 @@ func (this *ArrangedDriverPool) DelArrangedDriver(e *DriverElement) *DriverEleme
 	this.Lock.Lock()
 	delete(this.ArrangedList, e.Uid)
 	this.Lock.Unlock()
+	DelAdriverFromCache(e.Uid)
 	return elem
 }
 
@@ -142,6 +148,7 @@ func (this *ArrangedDriverPool) DelArrangedDriverById(uid string) *DriverElement
 	elem := this.ArrangedList[uid]
 	delete(this.ArrangedList, uid)
 	this.Lock.Unlock()
+	DelAdriverFromCache(uid)
 	return elem
 }
 
@@ -164,28 +171,42 @@ func Sched() {
 	}
 }
 
-func FlushDriverToCache(key string, elem *DriverElement) {
+func FlushDriverToCache(elem *DriverElement) {
 	str, err := json.Marshal(elem)
 	if err != nil {
 		logger.Error("FlushDriverToCache error:", err)
 		return
 	}
-	_, err = RedisConn.Do("hset", "driver", key, str)
+	_, err = RedisConn.Do("hset", "driver", elem.Uid, str)
 	if err != nil {
-		logger.Error("FlushDriverToCache error", err)
+		logger.Error("FlushDriverToCache failure", err)
 	}
 	return
 }
 
-func FlushAdriverToCache(key string, elem *DriverElement) {
+func FlushAdriverToCache(elem *DriverElement) {
 	str, err := json.Marshal(elem)
 	if err != nil {
 		logger.Error("FlushAdriverToCache error:", err)
 		return
 	}
-	_, err = RedisConn.Do("hset", "adriver", key, str)
+	_, err = RedisConn.Do("hset", "adriver", elem.Uid, str)
 	if err != nil {
-		logger.Error("FlushAdriverToCache error", err)
+		logger.Error("FlushAdriverToCache failure", err)
 	}
 	return
+}
+
+func DelDriverFromCache(key string) {
+	_, err := RedisConn.Do("hdel", "driver", key)
+	if err != nil {
+		logger.Error("DelDriverFromCache failure", err)
+	}
+}
+
+func DelAdriverFromCache(key string) {
+	_, err := RedisConn.Do("hdel", "adriver", key)
+	if err != nil {
+		logger.Error("DelAdriverFromCache failure", err)
+	}
 }

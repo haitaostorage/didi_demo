@@ -28,3 +28,6 @@ func (this *PassengerState) UpdatePassengerState() {
 	}
 	Opool.Lock.Unlock()
 }
+
+
+

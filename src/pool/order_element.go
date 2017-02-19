@@ -110,12 +110,14 @@ func (this *OrderPool) UpdateOrderDriverInfo(e *OrderElement, uid string) {
 	e.Duid = uid
 	e.Status = models.DISPATCH
 	this.Lock.Unlock()
+	FlushOrderToCahce(e)
 }
 
 func (this *OrderPool) AddOrder(e *OrderElement) {
 	this.Lock.Lock()
 	this.OrderList[e.Puid] = e
 	this.Lock.Unlock()
+	FlushOrderToCache(e)
 
 }
 
@@ -124,6 +126,7 @@ func (this *OrderPool) DelOrder(e *OrderElement) *OrderElement {
 	elem := this.OrderList[e.Puid]
 	delete(this.OrderList, e.Puid)
 	this.Lock.Unlock()
+	DelOrderFromCache(e.Puid)
 	return elem
 }
 
@@ -132,6 +135,7 @@ func (this *OrderPool) DelOrderById(uid string) *OrderElement {
 	elem := this.OrderList[uid]
 	delete(this.OrderList, uid)
 	this.Lock.Unlock()
+	DelOrderFromCache(uid)
 	return elem
 }
 
@@ -171,16 +175,23 @@ func (this *OrderElement) ArrangeDriver() {
 	logger.Info("arrange an suitbale driver for the order")
 }
 
-func FlushOrderToCache(key string, order *OrderElement) {
+func FlushOrderToCache(elem *OrderElement) {
 	str, err := json.Marshal(elem)
 	if err != nil {
-		logger.Error("FlushOrderToCache error:", err)
+		logger.Error("FlushOrderToCache failure", err)
 		return
 	}
-	_, err = RedisConn.Do("hset", "order", key, str)
+	_, err = RedisConn.Do("hset", "order", elem.Puid, str)
 	if err != nil {
-		logger.Error("FlushAdriverToCache error", err)
+		logger.Error("FlushOrderToCache failure", err)
 	}
 	return
 
+}
+
+func DelOrderFromCache(key string) {
+	_, err := RedisConn.Do("hdel", "order", key)
+	if err != nil {
+		logger.Error("DelOrderFromCache failure", err)
+	}
 }
